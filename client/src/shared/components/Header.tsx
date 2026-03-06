@@ -30,13 +30,7 @@ export const Header = memo(function Header() {
           fontFamily: "var(--font-display)", fontSize: "20px",
           fontWeight: "800", color: "var(--green)", letterSpacing: "-0.5px",
         }}>
-          groww
-        </span>
-        <span style={{
-          fontSize: "9px", color: "var(--text-muted)",
-          letterSpacing: "2px", fontFamily: "var(--font-mono)",
-        }}>
-          915
+          OmneNest
         </span>
       </div>
 

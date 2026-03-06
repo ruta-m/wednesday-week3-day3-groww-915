@@ -9,10 +9,6 @@ export const DashboardHeader = memo(function DashboardHeader() {
     const fetchConfig = async () => {
       try {
         const data = await getDashboardConfig();
-        
-        console.log("----------------------------");
-        console.log("DASHBOARD CONFIG DATA:", data);
-        console.log("----------------------------");
 
         // The path can vary based on the specific middleware version
         const featuresList = data?.dashboard?.features || data?.data?.features || data?.features || [];
