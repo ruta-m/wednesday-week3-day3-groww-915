@@ -19,7 +19,7 @@ export const getAuthHeaders = (token?: string) => {
         'deviceId': DEVICE_ID,
         'deviceIp': '10.0.2.16',
         'timestamp': ts,
-        'source': 'MOB',
+        'source': 'web',
         'appInstallId': DEVICE_ID,
         'userAgent': 'com.coditas.omnenest.omnenest_mobile_app.middlewareqa/1.0.6 (Google google sdk_gphone64_x86_64; Android 15 SDK35)',
         'xRequestId': `${DEVICE_ID}-${ts}` 
