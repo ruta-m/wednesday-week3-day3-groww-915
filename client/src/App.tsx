@@ -5,13 +5,19 @@ import { NotificationStack } from "@/shared/components/NotificationStack";
 import { DashboardPage } from "@/pages/DashboardPage";
 import { PortfolioPage } from "@/features/portfolio-overview/PortfolioPage";
 import { OrderBookPage } from "@/features/order-book/OrderBookPage";
-import { WatchlistPage } from "@/features/dashboard/WatchlistPage";
-import { LoginPage } from "@/features/auth/LoginPage"; // Import your new page
+
+// 1. Updated path for Watchlist
+import { WatchlistDisplay } from "./features/dashboard/WatchlistPage";
+
+import { LoginPage } from "@/features/auth/LoginPage";
 import { useUIStore } from "@/store/ui.store";
 import { DashboardHeader } from "@/shared/components/DashboardHeader";
 
+// 2. Ensure this component exports default or adjust the curly braces
+import IndicesPage from "./shared/components/IndicesPage"; 
+import NewsPage from "./shared/components/News";
+
 export default function App() {
-  // 1. Authentication State
   const [isAuthenticated, setIsAuthenticated] = useState(false);
 
   useEffect(() => {
@@ -19,7 +25,7 @@ export default function App() {
     if (token) setIsAuthenticated(true);
   }, []);
 
-  // 2. Starts WebSocket connection — only if authenticated
+  // Only connect to WS if logged in
   useWebSocket();
 
   const activeTab = useUIStore((s) => s.activeTab);
@@ -29,12 +35,13 @@ export default function App() {
       case "dashboard":  return <DashboardPage />;
       case "portfolio":  return <PortfolioPage />;
       case "orderbook":  return <OrderBookPage />;
-      case "watchlist":  return <WatchlistPage />;
+      case "watchlist":  return <WatchlistDisplay />;
+      case "indices":    return <IndicesPage />; // Now handles the "indices" state
+      case "news" : return <NewsPage />
       default:           return <DashboardPage />;
     }
   };
 
-  // 3. Conditional Rendering: If not logged in, show ONLY LoginPage
   if (!isAuthenticated) {
     return <LoginPage onLoginSuccess={() => setIsAuthenticated(true)} />;
   }
@@ -45,10 +52,19 @@ export default function App() {
       height: "100vh", overflow: "hidden",
       background: "var(--bg-void)",
     }}>
-      <DashboardHeader />
+      {/* This top bar stays visible across all tabs */}
+      <DashboardHeader /> 
+      
+      {/* Ensure your Header component has a button that calls setActiveTab("indices") */}
       <Header />
 
-      <main style={{ flex: 1, display: "flex", overflow: "hidden", position: "relative" }}>
+      <main style={{ 
+        flex: 1, 
+        display: "flex", 
+        flexDirection: "column", // Ensures child pages fill correctly
+        overflow: "auto",        // Allows pages like IndicesPage to scroll if needed
+        position: "relative" 
+      }}>
         {renderTab()}
       </main>
 

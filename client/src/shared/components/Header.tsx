@@ -13,6 +13,8 @@ export const Header = memo(function Header() {
     { id: "portfolio",  label: "Portfolio" },
     { id: "orderbook",  label: "Order Book" },
     { id: "watchlist",  label: "Watchlist" },
+    { id: "indices", label: "Indices"},
+    { id: "news", label: "News"}
   ];
 
   return (
