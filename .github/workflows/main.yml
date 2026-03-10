@@ -1,46 +1,102 @@
-
-## github workflow: testing
-
-name: Deploy to GitHub Pages
-
+name: CI/CD Pipeline
+ 
 on:
   push:
-    branches: [main]
-
-permissions:
-  contents: write
-  pages: write
-  id-token: write
-
+    branches: [main, master]
+  pull_request:
+    branches: [main, master]
+ 
 jobs:
-  build-and-deploy:
+ 
+  # ── Step 1: Test + Coverage Gate ──────────────────────────────
+  test:
+    name: Test & Coverage Gate
     runs-on: ubuntu-latest
-
     steps:
       - uses: actions/checkout@v4
-
+        with:
+          fetch-depth: 0
+ 
       - uses: actions/setup-node@v4
         with:
           node-version: '20'
-          cache: 'npm'
-
-      - run: npm ci
-
-      - run: npm run build
-
-      - uses: actions/upload-pages-artifact@v3
+ 
+      - run: npm install
+      - run: npm install --save-dev ts-node
+ 
+      - name: Update snapshots
+        run: npx jest --updateSnapshot --forceExit
+ 
+      - name: Run tests with coverage
+        run: npm run test:coverage -- --ci --forceExit
+ 
+      - name: Check coverage is ≥ 80%
+        run: |
+          FOUND=$(grep -h "^LF:" coverage/lcov.info | awk -F: '{s+=$2} END{print s}')
+          HIT=$(grep -h "^LH:" coverage/lcov.info | awk -F: '{s+=$2} END{print s}')
+          PCT=$(( HIT * 100 / FOUND ))
+          echo "Coverage: $PCT%"
+          [ "$PCT" -ge 80 ] || { echo " Coverage $PCT% < 80%. Failing."; exit 1; }
+ 
+      - uses: actions/upload-artifact@v4
         with:
-          path: dist
-
-  deploy:
+          name: coverage
+          path: coverage/
+ 
+  # ── Step 2: SonarQube Analysis ────────────────────────────────
+  sonar:
+    name: SonarQube Scan
     runs-on: ubuntu-latest
-    needs: build-and-deploy
-    if: github.ref == 'refs/heads/main'
-
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
-
+    needs: test
     steps:
-      - id: deployment
-        uses: actions/deploy-pages@v4
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+ 
+      - uses: actions/download-artifact@v4
+        with:
+          name: coverage
+          path: coverage/
+ 
+      - name: SonarQube Scan
+        uses: SonarSource/sonarqube-scan-action@v6
+        env:
+          SONAR_TOKEN: ${{ secrets.SECRET_TOKEN }}
+          SONAR_HOST_URL: https://symmetrical-happiness-wrx95qpjv6gxh544v-9000.app.github.dev/
+        with:
+          args: >
+            -Dsonar.projectKey=fintrading
+            -Dsonar.projectName=fintrading
+            -Dsonar.sources=src
+            -Dsonar.tests=src
+            -Dsonar.inclusions=src/**/*.ts,src/**/*.tsx
+            -Dsonar.exclusions=src/**/*.test.ts,src/**/*.test.tsx,src/setupTests.ts,src/main.tsx,node_modules/**,dist/**,coverage/**
+            -Dsonar.test.inclusions=src/**/*.test.ts,src/**/*.test.tsx
+            -Dsonar.javascript.lcov.reportPaths=coverage/lcov.info
+            -Dsonar.typescript.tsconfigPath=tsconfig.json
+ 
+      - name: SonarQube Quality Gate
+        uses: SonarSource/sonarqube-quality-gate-action@v1
+        timeout-minutes: 5
+        env:
+          SONAR_TOKEN: ${{ secrets.SECRET_TOKEN }}
+          SONAR_HOST_URL: https://symmetrical-happiness-wrx95qpjv6gxh544v-9000.app.github.dev/
+ 
+  # ── Step 3: Deploy (only on push to main/master) ──────────────
+  deploy:
+    name: Deploy to Production
+    runs-on: ubuntu-latest
+    needs: sonar
+    if: github.event_name == 'push'
+    steps:
+      - uses: actions/checkout@v4
+ 
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+ 
+      - run: npm install
+      - run: npm run build
+ 
+      - name: Deploy
+        run: echo " Deploy your app here (Vercel / S3 / Azure / etc.)"
