@@ -1,4 +1,4 @@
-# Groww-915 — Live Trading Dashboard
+# OmneNest — Live Trading Dashboard
 
 A production-grade real-time stock market dashboard built with:
 - **WebSocket server** (Node.js + ws)
