@@ -1,68 +1,105 @@
 import { useState, useEffect } from "react";
+
+// Hooks
 import { useWebSocket } from "@/shared/hooks/useWebSocket";
+import { useLiveMarketWs } from "@/shared/hooks/useLiveMarketWs";
+
+// Components
 import { Header } from "@/shared/components/Header";
 import { NotificationStack } from "@/shared/components/NotificationStack";
+import { DashboardHeader } from "@/shared/components/DashboardHeader";
+import { WsStatusBadge } from "@/shared/components/WsStatusBadge";
+
+// Pages
 import { DashboardPage } from "@/pages/DashboardPage";
 import { PortfolioPage } from "@/features/portfolio-overview/PortfolioPage";
 import { OrderBookPage } from "@/features/order-book/OrderBookPage";
-
-// 1. Updated path for Watchlist
-import { WatchlistDisplay } from "./features/dashboard/WatchlistPage";
-
 import { LoginPage } from "@/features/auth/LoginPage";
-import { useUIStore } from "@/store/ui.store";
-import { DashboardHeader } from "@/shared/components/DashboardHeader";
 
-// 2. Ensure this component exports default or adjust the curly braces
+// Updated paths from your old code
+import { WatchlistDisplay } from "./features/dashboard/WatchlistPage";
 import IndicesPage from "./shared/components/IndicesPage"; 
 import NewsPage from "./shared/components/News";
 
+// Stores & Services
+import { useUIStore } from "@/store/ui.store";
+import { wsManager } from "@/services/websocket";
+
+// ─── Token → clientCode helper ────────────────────────────────────────────────
+function getClientCodeFromToken(token: string | null): string {
+  if (!token) return "";
+  try {
+    const payload = JSON.parse(atob(token.split(".")[1]));
+    return (payload.clientCode ?? payload.sub ?? "") as string;
+  } catch {
+    return localStorage.getItem("client_code") ?? "";
+  }
+}
+
+// ─── Root component ────────────────────────────────────────────────────────────
 export default function App() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
-
-  useEffect(() => {
-    const token = localStorage.getItem('bearer_token');
-    if (token) setIsAuthenticated(true);
-  }, []);
-
-  // Only connect to WS if logged in
-  useWebSocket();
+  const [clientCode, setClientCode] = useState("");
 
   const activeTab = useUIStore((s) => s.activeTab);
 
+  useEffect(() => {
+    const token = localStorage.getItem("bearer_token");
+    if (token) {
+      setIsAuthenticated(true);
+      setClientCode(getClientCodeFromToken(token));
+    }
+  }, []);
+
+  // 1. Simulated local WebSocket (Unchanged)
+  useWebSocket();
+
+  // 2. Live Market WebSocket (Enabled on Auth)
+  useLiveMarketWs({
+    clientCode,
+    extraSubscriptions: [
+      { exchange: "NSE_CM", tokens: ["11377"] }, // HDFCBANK
+    ],
+  });
+
   const renderTab = () => {
     switch (activeTab) {
-      case "dashboard":  return <DashboardPage />;
-      case "portfolio":  return <PortfolioPage />;
-      case "orderbook":  return <OrderBookPage />;
-      case "watchlist":  return <WatchlistDisplay />;
-      case "indices":    return <IndicesPage />; // Now handles the "indices" state
-      case "news" : return <NewsPage />
-      default:           return <DashboardPage />;
+      case "dashboard": return <DashboardPage />;
+      case "portfolio": return <PortfolioPage />;
+      case "orderbook": return <OrderBookPage />;
+      case "watchlist": return <WatchlistDisplay />; // Using the display component from old code
+      case "indices":   return <IndicesPage />;
+      case "news":      return <NewsPage />;
+      default:          return <DashboardPage />;
     }
   };
 
   if (!isAuthenticated) {
-    return <LoginPage onLoginSuccess={() => setIsAuthenticated(true)} />;
+    return (
+      <LoginPage
+        onLoginSuccess={() => {
+          const token = localStorage.getItem("bearer_token");
+          setClientCode(getClientCodeFromToken(token));
+          setIsAuthenticated(true);
+        }}
+      />
+    );
   }
 
   return (
     <div style={{
       display: "flex", flexDirection: "column",
-      height: "100vh", overflow: "hidden",
+      height: "100vh", overflow: "auto",
       background: "var(--bg-void)",
     }}>
-      {/* This top bar stays visible across all tabs */}
-      <DashboardHeader /> 
-      
-      {/* Ensure your Header component has a button that calls setActiveTab("indices") */}
+      <DashboardHeader />
       <Header />
 
       <main style={{ 
         flex: 1, 
         display: "flex", 
-        flexDirection: "column", // Ensures child pages fill correctly
-        overflow: "auto",        // Allows pages like IndicesPage to scroll if needed
+        flexDirection: "column",
+        overflow: "auto", 
         position: "relative" 
       }}>
         {renderTab()}
@@ -72,13 +109,22 @@ export default function App() {
         padding: "4px 20px",
         borderTop: "1px solid var(--border)",
         background: "var(--bg-panel)",
-        display: "flex", justifyContent: "space-between",
+        display: "flex", justifyContent: "space-between", alignItems: "center",
         fontSize: "9px", color: "var(--text-muted)",
         fontFamily: "var(--font-mono)", letterSpacing: "0.5px",
         flexShrink: 0,
       }}>
-        <span>ws://localhost:8080</span>
-        <span>Groww-915 · Simulated data — for learning only</span>
+        {/* Left: simulated server info */}
+        <span>ws://localhost:8080 · Simulated data</span>
+
+        {/* Right: Live WebSocket status + Badge */}
+        <div style={{ display: "flex", alignItems: "center", gap: "16px" }}>
+          <span>wss://preprodapisix.omnenest.com · Live</span>
+          <WsStatusBadge
+            showRetry
+            onRetry={() => wsManager.connect(clientCode)}
+          />
+        </div>
       </footer>
 
       <NotificationStack />

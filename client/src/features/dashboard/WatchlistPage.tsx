@@ -11,7 +11,6 @@ export const WatchlistDisplay = memo(function WatchlistDisplay() {
       try {
         const data = await getWatchlistScrips();
         setWatchlistData(data);
-        setErrorStatus(null);
       } catch (err: any) {
         setErrorStatus(err.response?.status || 500);
       } finally {
@@ -21,52 +20,53 @@ export const WatchlistDisplay = memo(function WatchlistDisplay() {
     fetchData();
   }, []);
 
-  if (loading) return <div style={{ color: "var(--green)", padding: "20px", fontSize: "10px" }}>SYNCING WATCHLISTS...</div>;
+  if (loading) return <div style={{ color: "var(--green)", padding: "20px" }}>SYNCING...</div>;
 
-  // Combine both types of watchlists for display
-  const allWatchlists = [
-    ...(watchlistData?.userDefinedWatchlists || []),
-    ...(watchlistData?.predefinedWatchlists || [])
-  ];
+  // --- ROBUST EXTRACTION ---
+  // We check multiple common keys to ensure we get the arrays
+  const userWL = watchlistData?.userDefinedWatchlists || watchlistData?.userWatchlists || [];
+  const preWL  = watchlistData?.predefinedWatchlists || watchlistData?.systemWatchlists || [];
+  const defaultId = watchlistData?.defaultWatchlistId || watchlistData?.defaultId;
+
+  const allWatchlists = [...userWL, ...preWL];
 
   return (
     <div style={{ padding: "20px", background: "var(--bg-void)", minHeight: "100vh" }}>
-      <div style={{ fontSize: "12px", fontWeight: "bold", color: "var(--text-muted)", marginBottom: "20px", letterSpacing: "1px" }}>
-        YOUR WATCHLISTS
+      <div style={{ fontSize: "12px", color: "var(--text-muted)", marginBottom: "20px" }}>
+        YOUR WATCHLISTS ({allWatchlists.length})
       </div>
 
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))", gap: "16px" }}>
         {allWatchlists.length > 0 ? (
-          allWatchlists.map((wl) => (
+          allWatchlists.map((wl: any) => (
             <div 
-              key={wl.watchlistId} 
+              key={wl.watchlistId || wl.id} 
               style={{
                 background: "var(--bg-panel)",
-                border: wl.watchlistId === watchlistData?.defaultWatchlistId ? "1px solid var(--green)" : "1px solid var(--border)",
+                border: (wl.watchlistId === defaultId) ? "1px solid var(--green)" : "1px solid var(--border)",
                 borderRadius: "8px",
                 padding: "16px",
-                cursor: "pointer",
-                transition: "transform 0.2s"
               }}
             >
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                 <span style={{ fontSize: "14px", fontWeight: "bold", color: "var(--text-primary)" }}>
-                   {wl.watchlistName.toUpperCase()}
+                   {/* Fallback for name */}
+                   {(wl.watchlistName || wl.name || "Unnamed").toUpperCase()}
                 </span>
-                {wl.watchlistId === watchlistData?.defaultWatchlistId && (
-                  <span style={{ fontSize: "8px", color: "var(--green)", border: "1px solid var(--green)", padding: "2px 4px", borderRadius: "4px" }}>
+                {(wl.watchlistId === defaultId) && (
+                  <span style={{ fontSize: "8px", color: "var(--green)", border: "1px solid var(--green)", padding: "2px 4px" }}>
                     DEFAULT
                   </span>
                 )}
               </div>
               <div style={{ fontSize: "10px", color: "var(--text-muted)", marginTop: "8px" }}>
-                ID: {wl.watchlistId}
+                ID: {wl.watchlistId || wl.id}
               </div>
             </div>
           ))
         ) : (
           <div style={{ color: "var(--red)", fontSize: "11px" }}>
-            {errorStatus ? `ERROR: ${errorStatus}` : "NO WATCHLISTS FOUND"}
+            {errorStatus ? `ERROR: ${errorStatus}` : "NO DATA FOUND IN API RESPONSE"}
           </div>
         )}
       </div>

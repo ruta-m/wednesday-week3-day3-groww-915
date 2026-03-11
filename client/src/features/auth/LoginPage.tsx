@@ -1,16 +1,16 @@
-import React, { useState } from 'react';
-import { preAuthHandshake } from '@/services/apis/preAuthHandshake';
-import { login } from '@/services/apis/login';
-import { validateOtp } from '@/services/apis/otp';
+import React, { useState } from "react";
+import { preAuthHandshake } from "@/services/apis/preAuthHandshake";
+import { login } from "@/services/apis/login";
+import { validateOtp } from "@/services/apis/otp";
 
 interface LoginPageProps {
   onLoginSuccess: () => void;
 }
 
 export const LoginPage = ({ onLoginSuccess }: LoginPageProps) => {
-  const [username, setUsername] = useState('AMITH1');
-  const [password, setPassword] = useState('abc@12345');
-  const [otp, setOtp] = useState('');
+  const [username, setUsername] = useState("AMITH1");
+  const [password, setPassword] = useState("abc@12345");
+  const [otp, setOtp] = useState("");
   const [step, setStep] = useState(1);
   const [loading, setLoading] = useState(false);
 
@@ -33,15 +33,38 @@ export const LoginPage = ({ onLoginSuccess }: LoginPageProps) => {
     setLoading(true);
     try {
       const response = await validateOtp(username, otp);
-      const token = response?.jwtTokens?.accessToken;
+
+      // Log the full response to see exactly where the token is hiding
+      console.log("Full OTP Response:", response);
+
+      // FIX: Axios usually puts the server response in .data
+      // Check both standard locations:
+      const token =
+        response?.data?.jwtTokens?.accessToken ||
+        response?.jwtTokens?.accessToken;
+
       if (token) {
-        console.log('Token received:', token);
-        localStorage.setItem('bearer_token', token);
+        console.log("Success! Saving Token:", token.substring(0, 10) + "...");
+
+        // Clear old garbage before setting new
+        localStorage.removeItem("bearer_token");
+        localStorage.setItem("bearer_token", token);
+
+        // IMPORTANT: If your app needs the clientCode for the WebSocket,
+        // extract and save it here too.
+        const clientCode = response?.data?.clientCode || response?.clientCode;
+        if (clientCode) localStorage.setItem("client_code", clientCode);
+
         onLoginSuccess();
       } else {
-        alert("OTP Verified but no token received. Check API response structure.");
+        console.error(
+          "Token missing in response. Keys found:",
+          Object.keys(response || {}),
+        );
+        alert("OTP Verified but token not found in response.");
       }
-    } catch (err) {
+    } catch (err: any) {
+      console.error("OTP Error:", err.response?.data || err.message);
       alert("Invalid OTP or connection error.");
     } finally {
       setLoading(false);
@@ -527,7 +550,6 @@ export const LoginPage = ({ onLoginSuccess }: LoginPageProps) => {
       `}</style>
 
       <div className="gw-root">
-
         {/* Left branding panel */}
         <div className="gw-left">
           <div className="gw-logo">
@@ -538,23 +560,32 @@ export const LoginPage = ({ onLoginSuccess }: LoginPageProps) => {
           <div className="gw-ticker">
             <div className="gw-ticker-label">Live Market</div>
             {[
-              { sym:"HDFCBANK",  price:"₹1,706.67", chg:"+1.54%",  up:true  },
-              { sym:"INFY",      price:"₹1,583.85", chg:"+0.09%",  up:true  },
-              { sym:"AXISBANK",  price:"₹1,072.47", chg:"-2.71%",  up:false },
-              { sym:"RELIANCE",  price:"₹2,897.48", chg:"+0.60%",  up:true  },
-              { sym:"KOTAKBANK", price:"₹1,825.33", chg:"-2.72%",  up:false },
-            ].map(s => (
+              { sym: "HDFCBANK", price: "₹1,706.67", chg: "+1.54%", up: true },
+              { sym: "INFY", price: "₹1,583.85", chg: "+0.09%", up: true },
+              { sym: "AXISBANK", price: "₹1,072.47", chg: "-2.71%", up: false },
+              { sym: "RELIANCE", price: "₹2,897.48", chg: "+0.60%", up: true },
+              {
+                sym: "KOTAKBANK",
+                price: "₹1,825.33",
+                chg: "-2.72%",
+                up: false,
+              },
+            ].map((s) => (
               <div className="gw-ticker-row" key={s.sym}>
                 <span className="ticker-symbol">{s.sym}</span>
                 <span className="ticker-price">{s.price}</span>
-                <span className={`ticker-chg ${s.up ? "up" : "down"}`}>{s.chg}</span>
+                <span className={`ticker-chg ${s.up ? "up" : "down"}`}>
+                  {s.chg}
+                </span>
               </div>
             ))}
           </div>
 
           <div className="gw-left-footer">
             <div className="live-dot" />
-            <span className="live-label">ws://localhost:8080 · SIMULATED DATA</span>
+            <span className="live-label">
+              ws://localhost:8080 · SIMULATED DATA
+            </span>
           </div>
         </div>
 
@@ -575,16 +606,36 @@ export const LoginPage = ({ onLoginSuccess }: LoginPageProps) => {
           {/* Step indicator */}
           <div className="gw-steps">
             <div className={`gw-step-node ${step === 1 ? "active" : "done"}`}>
-              {step > 1
-                ? <svg width="11" height="11" viewBox="0 0 11 11" fill="none">
-                    <path d="M2 5.5l2.5 2.5 4.5-4.5" stroke="#00c076" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
-                  </svg>
-                : "1"}
+              {step > 1 ? (
+                <svg width="11" height="11" viewBox="0 0 11 11" fill="none">
+                  <path
+                    d="M2 5.5l2.5 2.5 4.5-4.5"
+                    stroke="#00c076"
+                    strokeWidth="1.8"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
+                </svg>
+              ) : (
+                "1"
+              )}
             </div>
-            <span className={`gw-step-label ${step === 1 ? "active-label" : ""}`}>Credentials</span>
+            <span
+              className={`gw-step-label ${step === 1 ? "active-label" : ""}`}
+            >
+              Credentials
+            </span>
             <div className={`gw-step-line ${step > 1 ? "filled" : ""}`} />
-            <div className={`gw-step-node ${step === 2 ? "active" : "pending"}`}>2</div>
-            <span className={`gw-step-label ${step === 2 ? "active-label" : ""}`}>Verify OTP</span>
+            <div
+              className={`gw-step-node ${step === 2 ? "active" : "pending"}`}
+            >
+              2
+            </div>
+            <span
+              className={`gw-step-label ${step === 2 ? "active-label" : ""}`}
+            >
+              Verify OTP
+            </span>
           </div>
 
           {/* Form */}
@@ -595,9 +646,26 @@ export const LoginPage = ({ onLoginSuccess }: LoginPageProps) => {
                   <div className="gw-field">
                     <label className="gw-field-label">User ID</label>
                     <div className="gw-input-wrap">
-                      <svg className="gw-input-icon" width="14" height="14" viewBox="0 0 16 16" fill="none">
-                        <circle cx="8" cy="6" r="3" stroke="currentColor" strokeWidth="1.4"/>
-                        <path d="M2 14c0-3.314 2.686-5 6-5s6 1.686 6 5" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"/>
+                      <svg
+                        className="gw-input-icon"
+                        width="14"
+                        height="14"
+                        viewBox="0 0 16 16"
+                        fill="none"
+                      >
+                        <circle
+                          cx="8"
+                          cy="6"
+                          r="3"
+                          stroke="currentColor"
+                          strokeWidth="1.4"
+                        />
+                        <path
+                          d="M2 14c0-3.314 2.686-5 6-5s6 1.686 6 5"
+                          stroke="currentColor"
+                          strokeWidth="1.4"
+                          strokeLinecap="round"
+                        />
                       </svg>
                       <input
                         type="text"
@@ -605,16 +673,35 @@ export const LoginPage = ({ onLoginSuccess }: LoginPageProps) => {
                         className="gw-input"
                         placeholder="Enter username"
                         value={username}
-                        onChange={e => setUsername(e.target.value)}
+                        onChange={(e) => setUsername(e.target.value)}
                       />
                     </div>
                   </div>
                   <div className="gw-field">
                     <label className="gw-field-label">Password</label>
                     <div className="gw-input-wrap">
-                      <svg className="gw-input-icon" width="14" height="14" viewBox="0 0 16 16" fill="none">
-                        <rect x="3" y="7" width="10" height="7" rx="2" stroke="currentColor" strokeWidth="1.4"/>
-                        <path d="M5.5 7V5a2.5 2.5 0 015 0v2" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"/>
+                      <svg
+                        className="gw-input-icon"
+                        width="14"
+                        height="14"
+                        viewBox="0 0 16 16"
+                        fill="none"
+                      >
+                        <rect
+                          x="3"
+                          y="7"
+                          width="10"
+                          height="7"
+                          rx="2"
+                          stroke="currentColor"
+                          strokeWidth="1.4"
+                        />
+                        <path
+                          d="M5.5 7V5a2.5 2.5 0 015 0v2"
+                          stroke="currentColor"
+                          strokeWidth="1.4"
+                          strokeLinecap="round"
+                        />
                       </svg>
                       <input
                         type="password"
@@ -622,7 +709,7 @@ export const LoginPage = ({ onLoginSuccess }: LoginPageProps) => {
                         className="gw-input"
                         placeholder="Enter password"
                         value={password}
-                        onChange={e => setPassword(e.target.value)}
+                        onChange={(e) => setPassword(e.target.value)}
                       />
                     </div>
                   </div>
@@ -637,9 +724,11 @@ export const LoginPage = ({ onLoginSuccess }: LoginPageProps) => {
                     className="gw-otp-input"
                     placeholder="0000"
                     value={otp}
-                    onChange={e => setOtp(e.target.value)}
+                    onChange={(e) => setOtp(e.target.value)}
                   />
-                  <p className="gw-otp-hint">Code sent to <span>{username}</span>'s registered device</p>
+                  <p className="gw-otp-hint">
+                    Code sent to <span>{username}</span>'s registered device
+                  </p>
                 </div>
               )}
             </div>
@@ -647,12 +736,20 @@ export const LoginPage = ({ onLoginSuccess }: LoginPageProps) => {
             <button type="submit" disabled={loading} className="gw-btn">
               <div className="gw-btn-inner">
                 {loading ? (
-                  <><div className="gw-spinner" /> Authenticating…</>
+                  <>
+                    <div className="gw-spinner" /> Authenticating…
+                  </>
                 ) : (
                   <>
                     {step === 1 ? "CONTINUE" : "VERIFY & LOGIN"}
                     <svg width="13" height="13" viewBox="0 0 14 14" fill="none">
-                      <path d="M2.5 7h9M8 3l3.5 4L8 11" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"/>
+                      <path
+                        d="M2.5 7h9M8 3l3.5 4L8 11"
+                        stroke="currentColor"
+                        strokeWidth="1.6"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      />
                     </svg>
                   </>
                 )}
@@ -662,7 +759,9 @@ export const LoginPage = ({ onLoginSuccess }: LoginPageProps) => {
 
           <div className="gw-divider">
             <div className="gw-divider-line" />
-            <span className="gw-divider-text">256-BIT ENCRYPTED · SIMULATED DATA</span>
+            <span className="gw-divider-text">
+              256-BIT ENCRYPTED · SIMULATED DATA
+            </span>
             <div className="gw-divider-line" />
           </div>
         </div>
